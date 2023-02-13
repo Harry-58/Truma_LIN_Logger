@@ -4,23 +4,22 @@
 #include <myUtils.h>
 
 #define DEBUG__EIN  //"Schalter" zum aktivieren von DEBUG-Ausgaben
-#include <SoftwareSerial.h>
+#include <espSoftwareSerial.h>
 #include <myDebug.h>
 #include <truma.h>
 
 /* LIN PACKET:
-   Aufbau:
     ___________ __________ _______ ____________ _________
    |           |          |       |            |         |
-   |Synch Break|Sync Byte |ID byte| Data Bytes |Checksum |
+   |Sync Break |Sync Byte |ID byte| Data Bytes |Checksum |
    |___________|__________|_______|____________|_________|
 
    Jedes Byte hat ein Startbit und ein Stoppbit und zuerst wird das LSB gesendet.
-   Synch Break - 13 Bits dominanter Zustand ("0"), gefolgt von 1 Bit rezessivem Zustand ("1")
-   Synch Byte  - Byte für Baud-Rate Syncronisation, immer 0x55
-   ID Byte     - bestehend aus Parität, Länge und Adresse; die Parität wird durch den LIN-Standard bestimmt und hängt von der Adresse und der Nachrichtenlänge ab
-   Datenbytes  - benutzerdefiniert; abhängig von den Geräten am LIN-Bus
-   Prüfsumme   - invertierte 256er Prüfsumme; Datenbytes werden summiert und dann invertiert
+   Sync Break - 13 Bits dominanter Zustand ("0"), gefolgt von 1 Bit rezessivem Zustand ("1")
+   Sync Byte  - Byte für Baud-Rate Syncronisation, immer 0x55
+   ID Byte    - bestehend aus Parität, Länge und Adresse; die Parität wird durch den LIN-Standard bestimmt und hängt von der Adresse und der Nachrichtenlänge ab
+   Datenbytes - benutzerdefiniert; abhängig von den Geräten am LIN-Bus
+   Prüfsumme  - invertierte 256er Prüfsumme; Datenbytes werden summiert und dann invertiert
 
 
    https://github.com/mestrode/Lin-Interface-Library/blob/main/src/Lin_Interface.cpp
@@ -28,10 +27,12 @@
 
 // LIN serial Interface
 const uint16_t linSpeed = 9600;  // speed LIN of IBS-Sensor (do not change)
-const int16_t linRX     = 2;     // rot    13;   // RX Pin LIN serial
-const int16_t linTX     = 3;     // orange 12;   // TX Pin LIN serial
+const int16_t linRX     = 17;     // grau    --> ESP-TX (17)
+const int16_t linTX     = 16;     // orange  --> ESP-RX (16)
 
- #define test
+
+
+//#define test
 #ifndef test
 SoftwareSerial linSerial(linTX, linRX);  // RX, TX
 #else
@@ -55,6 +56,8 @@ void loop();
 bool linLoop();
 void linDecode();
 void linLoop2();
+void linLoop3();
+
 void serialCommand();
 uint8_t getChecksum(uint8_t ProtectedID, uint8_t dataLen);
 template <typename... T>
@@ -67,6 +70,8 @@ void setup() {
   Serial << "\n\n" << ProjektName << " - " << VERSION << "  (" << BUILDDATE << "  " __TIME__ << ")" << endl;
 
   linSerial.begin(linSpeed);
+
+
 }
 
 void loop() {
@@ -79,6 +84,9 @@ void loop() {
       break;
     case 2:
       linLoop2();
+      break;
+    case 3:
+      linLoop3();
       break;
   }
 
@@ -229,6 +237,14 @@ void linLoop2() {
   return;
 }
 
+void linLoop3() {
+  byte ch;
+  if (linSerial.available()) {
+    ch = linSerial.read();
+    DEBUG__PRINTF("ch:%02x",ch);
+  }
+}
+
 void serialCommand() {
   String msg;
   int tmp;
@@ -239,7 +255,7 @@ void serialCommand() {
       case 'm':
         tmp = msg.substring(1).toInt();
         DEBUG__PRINTF("LogMode:%i\n", tmp);
-        if (tmp >= 0 && tmp <= 2) {
+        if (tmp >= 0 && tmp <= 3) {
           logMode = tmp;
         }
         break;
